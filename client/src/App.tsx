@@ -15,10 +15,11 @@ import { FooterDisclaimer } from './components/FooterDisclaimer.js';
 import { AccumulatorProvider } from './context/AccumulatorContext.js';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { SUPPORTED_LEAGUES } from './config/leagues.js';
+import { getAutoDetectedTimezone } from './utils/timezone.js';
 
 export const AppContent: React.FC = () => {
   const [darkMode, setDarkMode] = useState(true);
-  const [timezone, setTimezone] = useState('Africa/Accra');
+  const [timezone, setTimezone] = useState(() => getAutoDetectedTimezone());
   const [leagues, setLeagues] = useState<LeagueConfig[]>(SUPPORTED_LEAGUES);
   const [selectedLeague, setSelectedLeague] = useState('PL');
   const [selectedDate, setSelectedDate] = useState('ALL');
@@ -26,9 +27,26 @@ export const AppContent: React.FC = () => {
   const [activeView, setActiveView] = useState<'matches' | 'strongest' | 'value'>('matches');
 
   const [fixtures, setFixtures] = useState<MatchFixture[]>([]);
-  const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [lastUpdated, setLastUpdated] = useState<string>(new Date().toISOString());
+  const [dataStatus, setDataStatus] = useState<'live' | 'delayed' | 'offline'>('delayed');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Monitor online / offline state
+  useEffect(() => {
+    const handleOnline = () => {
+      setDataStatus('delayed');
+    };
+    const handleOffline = () => {
+      setDataStatus('offline');
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Modals
   const [isCustomMatchOpen, setIsCustomMatchOpen] = useState(false);
@@ -61,11 +79,19 @@ export const AppContent: React.FC = () => {
     getFixtures(selectedLeague, 7)
       .then((res) => {
         setFixtures(res.fixtures);
-        setLastUpdated(res.lastUpdated);
+        setLastUpdated(res.lastUpdated || new Date().toISOString());
+        if (!navigator.onLine) {
+          setDataStatus('offline');
+        } else if (res.provider === 'Live API') {
+          setDataStatus('live');
+        } else {
+          setDataStatus('delayed');
+        }
         setLoading(false);
       })
       .catch((err) => {
         setError(err.message || 'Failed to load fixtures');
+        setDataStatus(navigator.onLine ? 'delayed' : 'offline');
         setLoading(false);
       });
   };
@@ -106,6 +132,8 @@ export const AppContent: React.FC = () => {
         activeView={activeView}
         setActiveView={setActiveView}
         lastUpdated={lastUpdated}
+        dataStatus={dataStatus}
+        isLoading={loading}
       />
 
       {/* Main Content Area */}

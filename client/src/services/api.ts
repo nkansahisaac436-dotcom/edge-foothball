@@ -46,7 +46,7 @@ export async function getFixtures(
   const fixtures = MobileDataProvider.getFixtures(leagueId);
   return {
     fixtures,
-    lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    lastUpdated: new Date().toISOString(),
     provider: 'Matchday Edge Engine',
   };
 }

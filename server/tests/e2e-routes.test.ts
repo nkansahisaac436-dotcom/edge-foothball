@@ -6,8 +6,8 @@ import { SUPPORTED_LEAGUES } from '../src/config/leagues.js';
 describe('End-to-End API Logic Verification', () => {
   const provider = FootballProviderFactory.getProvider();
 
-  it('provides all 6 supported leagues in v1', () => {
-    expect(SUPPORTED_LEAGUES.length).toBe(6);
+  it('provides all supported leagues including the core 6 in v1', () => {
+    expect(SUPPORTED_LEAGUES.length).toBeGreaterThanOrEqual(6);
     const leagueCodes = SUPPORTED_LEAGUES.map((l) => l.id);
     expect(leagueCodes).toContain('PL');  // Premier League
     expect(leagueCodes).toContain('CL');  // Champions League

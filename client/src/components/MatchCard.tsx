@@ -3,8 +3,9 @@ import { MatchFixture, MatchPrediction } from '../types/index.js';
 import { getMatchPredictions } from '../services/api.js';
 import { MarketGroupDrawer } from './MarketGroupDrawer.js';
 import { MatchAnalysisSection } from './MatchAnalysisSection.js';
-import { ChevronDown, ChevronUp, Shield, Sparkles, Clock, AlertCircle, Plus, Check } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock, AlertCircle, Plus, Check, Sparkles } from 'lucide-react';
 import { useAccumulator } from '../context/AccumulatorContext.js';
+import { formatKickoffTime, formatTimeOnly } from '../utils/timezone.js';
 
 interface MatchCardProps {
   fixture: MatchFixture;
@@ -102,7 +103,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({
           </span>
           <span className="flex items-center space-x-1">
             <Clock className="w-3 h-3 text-sporty-green" />
-            <span>{formatKickoff(fixture.utcDate)}</span>
+            <span>{formatKickoffTime(fixture.utcDate, timezone)}</span>
           </span>
         </div>
 
@@ -139,21 +140,34 @@ export const MatchCard: React.FC<MatchCardProps> = ({
           </span>
         </div>
 
-        {/* VS / Score */}
+        {/* VS / Score / Kickoff slot */}
         <div className="col-span-1 text-center">
-          {fixture.status === 'FINISHED' || fixture.status === 'LIVE' ? (
+          {fixture.status === 'LIVE' && fixture.score?.fullTime?.home !== null && fixture.score?.fullTime?.home !== undefined ? (
             <div className="flex flex-col items-center">
-              <span className="font-black font-mono text-sm sm:text-base text-sporty-green">
-                {fixture.score?.fullTime.home ?? 0} - {fixture.score?.fullTime.away ?? 0}
+              <span className="font-bold font-mono text-sm sm:text-base text-rose-500">
+                {fixture.score.fullTime.home} - {fixture.score.fullTime.away}
               </span>
-              <span className="text-[9px] font-bold text-sporty-red animate-pulse">
-                {fixture.status}
+              <span className="text-[10px] font-bold text-rose-500 animate-pulse">
+                {fixture.minute || 'LIVE'}
+              </span>
+            </div>
+          ) : fixture.status === 'FINISHED' && fixture.score?.fullTime?.home !== null && fixture.score?.fullTime?.home !== undefined ? (
+            <div className="flex flex-col items-center">
+              <span className="font-bold font-mono text-sm sm:text-base text-gray-200">
+                {fixture.score.fullTime.home} - {fixture.score.fullTime.away}
+              </span>
+              <span className="text-[10px] font-bold text-gray-400">
+                FT
               </span>
             </div>
           ) : (
-            <span className="text-xs font-bold font-mono text-gray-400 bg-gray-800/80 px-2 py-1 rounded-md border border-gray-700">
-              VS
-            </span>
+            /* Not started / Scheduled: NEVER show fake scores or predicted scores */
+            <div className="flex flex-col items-center justify-center">
+              <span className="text-xs font-bold font-mono text-gray-200 bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
+                {formatTimeOnly(fixture.utcDate, timezone)}
+              </span>
+              <span className="text-[9px] text-gray-500 font-sans mt-0.5">Kickoff</span>
+            </div>
           )}
         </div>
 
