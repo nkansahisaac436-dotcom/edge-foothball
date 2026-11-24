@@ -16,6 +16,21 @@ export interface MatchScore {
   };
 }
 
+export interface LiveMatchStats {
+  minute: number;
+  homeScore: number;
+  awayScore: number;
+  period?: '1H' | 'HT' | '2H' | 'FT';
+  possession?: [number, number]; // [home, away] e.g. [54, 46]
+  shotsTotal?: [number, number];
+  shotsOnTarget?: [number, number];
+  corners?: [number, number];
+  fouls?: [number, number];
+  yellowCards?: [number, number];
+  redCards?: [number, number];
+  liveStatusText?: string;
+}
+
 export interface BookmakerOdds {
   homeWin: number;
   draw: number;
@@ -32,6 +47,8 @@ export interface MatchFixture {
   leagueId: string;
   leagueName: string;
   leagueLogo?: string;
+  country?: string;
+  countryFlag?: string;
   round?: string;
   utcDate: string;
   status: 'SCHEDULED' | 'TIMED' | 'LIVE' | 'FINISHED' | 'POSTPONED';
@@ -40,6 +57,8 @@ export interface MatchFixture {
   score?: MatchScore;
   odds?: BookmakerOdds;
   venue?: string;
+  minute?: number | string;
+  liveStats?: LiveMatchStats;
 }
 
 export interface TeamMatchStats {

@@ -79,6 +79,19 @@ export const SUPPORTED_LEAGUES: LeagueConfig[] = [
     defaultLeagueAvgCards: 4.0,
     currentSeason: 2024,
   },
+  {
+    id: 'ELC',
+    name: 'Championship',
+    country: 'England',
+    logo: 'https://media.api-sports.io/football/leagues/40.png',
+    apiFootballId: 40,
+    footballDataOrgCode: 'ELC',
+    defaultHomeAdvantage: 1.23,
+    defaultLeagueAvgGoals: 2.65,
+    defaultLeagueAvgCorners: 10.1,
+    defaultLeagueAvgCards: 4.2,
+    currentSeason: 2024,
+  },
 ];
 
 export function getLeagueById(id: string): LeagueConfig | undefined {
