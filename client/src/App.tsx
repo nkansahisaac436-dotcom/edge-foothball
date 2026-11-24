@@ -14,20 +14,12 @@ import { AccumulatorDrawer } from './components/AccumulatorDrawer.js';
 import { FooterDisclaimer } from './components/FooterDisclaimer.js';
 import { AccumulatorProvider } from './context/AccumulatorContext.js';
 import { AlertCircle, RefreshCw } from 'lucide-react';
-
-const FALLBACK_LEAGUES: LeagueConfig[] = [
-  { id: 'PL', name: 'Premier League', country: 'England', logo: 'https://media.api-sports.io/football/leagues/39.png', defaultHomeAdvantage: 1.25, defaultLeagueAvgGoals: 2.85, defaultLeagueAvgCorners: 10.4, defaultLeagueAvgCards: 4.1 },
-  { id: 'CL', name: 'UEFA Champions League', country: 'Europe', logo: 'https://media.api-sports.io/football/leagues/2.png', defaultHomeAdvantage: 1.22, defaultLeagueAvgGoals: 3.05, defaultLeagueAvgCorners: 9.8, defaultLeagueAvgCards: 3.9 },
-  { id: 'PD', name: 'La Liga', country: 'Spain', logo: 'https://media.api-sports.io/football/leagues/140.png', defaultHomeAdvantage: 1.20, defaultLeagueAvgGoals: 2.60, defaultLeagueAvgCorners: 9.6, defaultLeagueAvgCards: 4.8 },
-  { id: 'BL1', name: 'Bundesliga', country: 'Germany', logo: 'https://media.api-sports.io/football/leagues/78.png', defaultHomeAdvantage: 1.26, defaultLeagueAvgGoals: 3.15, defaultLeagueAvgCorners: 10.2, defaultLeagueAvgCards: 3.8 },
-  { id: 'SA', name: 'Serie A', country: 'Italy', logo: 'https://media.api-sports.io/football/leagues/135.png', defaultHomeAdvantage: 1.18, defaultLeagueAvgGoals: 2.55, defaultLeagueAvgCorners: 9.7, defaultLeagueAvgCards: 4.4 },
-  { id: 'FL1', name: 'Ligue 1', country: 'France', logo: 'https://media.api-sports.io/football/leagues/61.png', defaultHomeAdvantage: 1.21, defaultLeagueAvgGoals: 2.70, defaultLeagueAvgCorners: 9.5, defaultLeagueAvgCards: 4.0 },
-];
+import { SUPPORTED_LEAGUES } from './config/leagues.js';
 
 export const AppContent: React.FC = () => {
   const [darkMode, setDarkMode] = useState(true);
   const [timezone, setTimezone] = useState('Africa/Accra');
-  const [leagues, setLeagues] = useState<LeagueConfig[]>(FALLBACK_LEAGUES);
+  const [leagues, setLeagues] = useState<LeagueConfig[]>(SUPPORTED_LEAGUES);
   const [selectedLeague, setSelectedLeague] = useState('PL');
   const [selectedDate, setSelectedDate] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');

@@ -16,6 +16,21 @@ export interface MatchScore {
   };
 }
 
+export interface LiveMatchStats {
+  minute: number;
+  homeScore: number;
+  awayScore: number;
+  period?: '1H' | 'HT' | '2H' | 'FT';
+  possession?: [number, number]; // [home, away] e.g. [54, 46]
+  shotsTotal?: [number, number];
+  shotsOnTarget?: [number, number];
+  corners?: [number, number];
+  fouls?: [number, number];
+  yellowCards?: [number, number];
+  redCards?: [number, number];
+  liveStatusText?: string;
+}
+
 export interface BookmakerOdds {
   homeWin: number;
   draw: number;
@@ -32,6 +47,8 @@ export interface MatchFixture {
   leagueId: string;
   leagueName: string;
   leagueLogo?: string;
+  country?: string;
+  countryFlag?: string;
   round?: string;
   utcDate: string;
   status: 'SCHEDULED' | 'TIMED' | 'LIVE' | 'FINISHED' | 'POSTPONED';
@@ -40,6 +57,39 @@ export interface MatchFixture {
   score?: MatchScore;
   odds?: BookmakerOdds;
   venue?: string;
+  minute?: number | string;
+  liveStats?: LiveMatchStats;
+}
+
+export interface TeamMatchStats {
+  matchId: string | number;
+  date: string;
+  isHome: boolean;
+  opponentId: string | number;
+  opponentName: string;
+  goalsFor: number;
+  goalsAgainst: number;
+  cornersFor: number;
+  cornersAgainst: number;
+  yellowCards: number;
+  redCards: number;
+  shotsTotal?: number;
+  shotsOnTarget?: number;
+}
+
+export interface TeamStanding {
+  position: number;
+  teamId: string | number;
+  teamName: string;
+  playedGames: number;
+  won: number;
+  draw: number;
+  lost: number;
+  points: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  form?: string;
 }
 
 export interface LeagueConfig {
@@ -47,10 +97,13 @@ export interface LeagueConfig {
   name: string;
   country: string;
   logo: string;
+  apiFootballId: number;
+  footballDataOrgCode: string;
   defaultHomeAdvantage: number;
   defaultLeagueAvgGoals: number;
   defaultLeagueAvgCorners: number;
   defaultLeagueAvgCards: number;
+  currentSeason: number;
 }
 
 export type ConfidenceLevel = 'High' | 'Medium' | 'Low';
@@ -156,8 +209,6 @@ export interface AccumulatorLeg {
 
 export interface CalibrationBin {
   binRange: string;
-  minProb: number;
-  maxProb: number;
   count: number;
   avgPredictedProb: number;
   actualWinRate: number;
@@ -166,7 +217,6 @@ export interface CalibrationBin {
 
 export interface BacktestResults {
   totalMatches: number;
-  evaluatedMarkets: string[];
   matchResult1X2: {
     accuracy: number;
     brierScore: number;
@@ -181,5 +231,5 @@ export interface BacktestResults {
     brierScore: number;
   };
   calibrationTable: CalibrationBin[];
-  summary: string;
+  summary?: string;
 }
