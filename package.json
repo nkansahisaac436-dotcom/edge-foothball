@@ -1,0 +1,27 @@
+{
+  "name": "matchday-edge",
+  "version": "1.0.0",
+  "description": "Matchday Edge - Mobile-first Football Prediction PWA (Dixon-Coles Poisson & NegBinomial)",
+  "scripts": {
+    "install:all": "npm install --prefix server && npm install --prefix client",
+    "build:server": "npm run build --prefix server",
+    "build:client": "npm run build --prefix client",
+    "build": "npm run build:server && npm run build:client",
+    "start": "node server/dist/index.js",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "test": "npm test --prefix server",
+    "backtest": "npm run backtest --prefix server"
+  },
+  "keywords": [
+    "football",
+    "predictions",
+    "dixon-coles",
+    "pwa",
+    "betting-markets",
+    "corners",
+    "cards"
+  ],
+  "author": "",
+  "license": "MIT"
+}

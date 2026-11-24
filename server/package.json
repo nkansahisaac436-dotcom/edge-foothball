@@ -1,0 +1,37 @@
+{
+  "name": "matchday-edge-server",
+  "version": "1.0.0",
+  "description": "Matchday Edge football prediction engine and API backend",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "backtest": "tsx src/scripts/backtest.ts"
+  },
+  "keywords": [
+    "football",
+    "prediction",
+    "dixon-coles",
+    "poisson",
+    "betting-markets"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.17.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
