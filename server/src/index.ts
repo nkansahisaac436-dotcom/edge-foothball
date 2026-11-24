@@ -42,7 +42,12 @@ if (staticPath) {
 }
 
 const portNumber = Number(PORT);
-app.listen(portNumber, '0.0.0.0', () => {
-  console.log(`🚀 Matchday Edge backend listening on http://127.0.0.1:${portNumber}`);
-  console.log(`📡 Ready for live predictions & market calculations`);
-});
+if (process.env.VERCEL !== '1') {
+  app.listen(portNumber, '0.0.0.0', () => {
+    console.log(`🚀 Matchday Edge backend listening on http://127.0.0.1:${portNumber}`);
+    console.log(`📡 Ready for live predictions & market calculations`);
+  });
+}
+
+export default app;
+export { app };

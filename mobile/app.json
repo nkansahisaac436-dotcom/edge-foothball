@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Matchday Edge",
+    "slug": "matchday-edge",
+    "owner": "heaven_bound",
+    "scheme": "matchdayedge",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0a0f1d"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.heavenbound.matchdayedge"
+    },
+    "android": {
+      "package": "com.heavenbound.matchdayedge",
+      "adaptiveIcon": {
+        "backgroundColor": "#0a0f1d"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

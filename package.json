@@ -11,7 +11,9 @@
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
     "test": "npm test --prefix server",
-    "backtest": "npm run backtest --prefix server"
+    "backtest": "npm run backtest --prefix server",
+    "mobile": "npm start --prefix mobile -- --tunnel",
+    "mobile:local": "npm start --prefix mobile"
   },
   "keywords": [
     "football",
