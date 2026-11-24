@@ -6,7 +6,7 @@
     "install:all": "npm install --prefix server && npm install --prefix client",
     "build:server": "npm run build --prefix server",
     "build:client": "npm run build --prefix client",
-    "build": "npm run build:server && npm run build:client",
+    "build": "npm run build:client && node -e \"const fs=require('fs'); if(fs.existsSync('client/dist') && !fs.existsSync('dist')){fs.cpSync('client/dist', 'dist', {recursive:true});} else if(fs.existsSync('dist') && !fs.existsSync('client/dist')){fs.cpSync('dist', 'client/dist', {recursive:true});}\"",
     "start": "node server/dist/index.js",
     "dev:server": "npm run dev --prefix server",
     "dev:client": "npm run dev --prefix client",
