@@ -51,6 +51,20 @@ export async function getFixtures(
   };
 }
 
+export async function getLiveFixtures(): Promise<MatchFixture[]> {
+  try {
+    const res = await fetch(`${API_BASE}/live`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.fixtures) return data.fixtures;
+    }
+  } catch (e) {
+    // Graceful fallback
+  }
+  const all = MobileDataProvider.getFixtures();
+  return all.filter((f) => ['LIVE', '1H', 'HT', '2H', 'ET', 'P', 'PEN'].includes(f.status));
+}
+
 export async function getMatchPredictions(
   matchId: string | number,
   leagueId: string = 'PL',

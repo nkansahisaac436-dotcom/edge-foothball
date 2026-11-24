@@ -5,6 +5,46 @@ export interface Team {
   logo?: string;
 }
 
+export type MatchStatus =
+  | 'SCHEDULED'
+  | 'TIMED'
+  | 'LIVE'
+  | '1H'
+  | 'HT'
+  | '2H'
+  | 'ET'
+  | 'P'
+  | 'PEN'
+  | 'FINISHED'
+  | 'FT'
+  | 'AET'
+  | 'POSTPONED'
+  | 'CANCELLED'
+  | 'SUSPENDED';
+
+export interface MatchEvent {
+  id: string;
+  type: 'GOAL' | 'CARD_YELLOW' | 'CARD_RED' | 'SUBSTITUTION' | 'VAR';
+  minute: number;
+  extraMinute?: number;
+  teamSide: 'home' | 'away';
+  playerName: string;
+  assistPlayerName?: string;
+  subInPlayerName?: string;
+  subOutPlayerName?: string;
+  detail?: string;
+}
+
+export interface InPlayProbabilities {
+  homeProb: number;
+  drawProb: number;
+  awayProb: number;
+  fairOddsHome: number;
+  fairOddsDraw: number;
+  fairOddsAway: number;
+  label: string; // e.g. "Live probability"
+}
+
 export interface MatchScore {
   fullTime: {
     home: number | null;
@@ -51,7 +91,7 @@ export interface MatchFixture {
   countryFlag?: string;
   round?: string;
   utcDate: string; // ISO 8601 string
-  status: 'SCHEDULED' | 'TIMED' | 'LIVE' | 'FINISHED' | 'POSTPONED';
+  status: MatchStatus;
   homeTeam: Team;
   awayTeam: Team;
   score?: MatchScore;
@@ -59,6 +99,8 @@ export interface MatchFixture {
   venue?: string;
   minute?: number | string;
   liveStats?: LiveMatchStats;
+  events?: MatchEvent[];
+  inPlayProbabilities?: InPlayProbabilities;
 }
 
 export interface TeamMatchStats {

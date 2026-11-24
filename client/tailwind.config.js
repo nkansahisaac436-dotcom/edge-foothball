@@ -8,16 +8,23 @@ export default {
   theme: {
     extend: {
       colors: {
+        edge: {
+          bg: '#0e1318',
+          card: '#161b22',
+          'card-hover': '#1f2630',
+          border: '#28303d',
+          muted: '#8b949e',
+          accent: '#2563eb',
+          'accent-hover': '#1d4ed8',
+          live: '#ef4444',
+          warning: '#f59e0b',
+        },
         sporty: {
-          green: '#00e676',
-          'green-dark': '#00c853',
-          'green-light': '#69f0ae',
-          red: '#ff5252',
-          gold: '#ffd600',
-          blue: '#2979ff',
-          dark: '#0a0f1d',
-          card: '#111827',
-          border: '#1f293d',
+          blue: '#2563eb',
+          red: '#ef4444',
+          dark: '#0e1318',
+          card: '#161b22',
+          border: '#28303d',
         },
       },
       fontFamily: {

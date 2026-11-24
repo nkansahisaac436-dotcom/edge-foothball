@@ -2,44 +2,55 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { getFixtures, getLeagues } from './services/api.js';
 import { LeagueConfig, MatchFixture } from './types/index.js';
 import { Navbar } from './components/Navbar.js';
-import { LeagueTabs } from './components/LeagueTabs.js';
-import { DateChips } from './components/DateChips.js';
-import { SearchBar } from './components/SearchBar.js';
-import { MatchCard } from './components/MatchCard.js';
+import { DateStrip } from './components/DateStrip.js';
+import { LeagueMatchGroup } from './components/LeagueMatchGroup.js';
+import { MatchDetailsModal } from './components/MatchDetailsModal.js';
+import { SettingsModal } from './components/SettingsModal.js';
+import { HowItWorksModal } from './components/HowItWorksModal.js';
 import { StrongestPicksPanel } from './components/StrongestPicksPanel.js';
 import { ValuePicksPanel } from './components/ValuePicksPanel.js';
 import { CustomMatchModal } from './components/CustomMatchModal.js';
 import { BacktestModal } from './components/BacktestModal.js';
 import { AccumulatorDrawer } from './components/AccumulatorDrawer.js';
 import { FooterDisclaimer } from './components/FooterDisclaimer.js';
+import { SettingsProvider, useSettings } from './context/SettingsContext.js';
 import { AccumulatorProvider } from './context/AccumulatorContext.js';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { useLiveScores, isLiveStatus } from './hooks/useLiveScores.js';
 import { SUPPORTED_LEAGUES } from './config/leagues.js';
-import { getAutoDetectedTimezone } from './utils/timezone.js';
+import { Search, AlertCircle, RefreshCw, Radio } from 'lucide-react';
 
-export const AppContent: React.FC = () => {
-  const [darkMode, setDarkMode] = useState(true);
-  const [timezone, setTimezone] = useState(() => getAutoDetectedTimezone());
-  const [leagues, setLeagues] = useState<LeagueConfig[]>(SUPPORTED_LEAGUES);
-  const [selectedLeague, setSelectedLeague] = useState('PL');
-  const [selectedDate, setSelectedDate] = useState('ALL');
+const MainContent: React.FC = () => {
+  const { t, timezone, isFavourite, favourites } = useSettings();
+
+  const [activeTab, setActiveTab] = useState<'matches' | 'live' | 'favourites' | 'strongest' | 'value'>('matches');
+  const [selectedDate, setSelectedDate] = useState('TODAY');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeView, setActiveView] = useState<'matches' | 'strongest' | 'value'>('matches');
 
-  const [fixtures, setFixtures] = useState<MatchFixture[]>([]);
+  const [rawFixtures, setRawFixtures] = useState<MatchFixture[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string>(new Date().toISOString());
   const [dataStatus, setDataStatus] = useState<'live' | 'delayed' | 'offline'>('delayed');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Monitor online / offline state
+  // Live Scores Hook with visibility state detection and subtle goal flash
+  const {
+    fixtures,
+    liveFixtures,
+    highlightedGoalMatchId,
+    activeLiveCount,
+  } = useLiveScores(rawFixtures);
+
+  // Modals
+  const [selectedMatch, setSelectedMatch] = useState<MatchFixture | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
+  const [isCustomMatchOpen, setIsCustomMatchOpen] = useState(false);
+  const [isBacktestOpen, setIsBacktestOpen] = useState(false);
+
+  // Network online/offline monitor
   useEffect(() => {
-    const handleOnline = () => {
-      setDataStatus('delayed');
-    };
-    const handleOffline = () => {
-      setDataStatus('offline');
-    };
+    const handleOnline = () => setDataStatus('delayed');
+    const handleOffline = () => setDataStatus('offline');
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {
@@ -48,37 +59,13 @@ export const AppContent: React.FC = () => {
     };
   }, []);
 
-  // Modals
-  const [isCustomMatchOpen, setIsCustomMatchOpen] = useState(false);
-  const [isBacktestOpen, setIsBacktestOpen] = useState(false);
-
-  // Sync dark class on body
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [darkMode]);
-
-  // Load leagues once
-  useEffect(() => {
-    getLeagues()
-      .then((data) => {
-        if (data && data.length > 0) setLeagues(data);
-      })
-      .catch(() => {
-        // Fallback leagues used
-      });
-  }, []);
-
-  // Fetch fixtures when league changes
-  const loadFixtures = () => {
+  // Fetch initial fixtures schedule across leagues
+  const loadSchedule = () => {
     setLoading(true);
     setError(null);
-    getFixtures(selectedLeague, 7)
+    getFixtures('ALL', 7)
       .then((res) => {
-        setFixtures(res.fixtures);
+        setRawFixtures(res.fixtures);
         setLastUpdated(res.lastUpdated || new Date().toISOString());
         if (!navigator.onLine) {
           setDataStatus('offline');
@@ -97,170 +84,244 @@ export const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
-    loadFixtures();
-  }, [selectedLeague]);
+    loadSchedule();
+  }, []);
 
-  // Filter fixtures by date and search query
-  const filteredFixtures = useMemo(() => {
-    return fixtures.filter((f) => {
-      // Date filter
-      if (selectedDate !== 'ALL') {
-        const fixtureDate = f.utcDate.split('T')[0];
-        if (fixtureDate !== selectedDate) return false;
+  // Sofascore-style League Grouping
+  const leagueGroups = useMemo(() => {
+    const groups: Record<string, { leagueId: string; leagueName: string; country: string; countryFlag: string; logo: string; fixtures: MatchFixture[] }> = {};
+
+    let source = fixtures;
+
+    // Filter by Tab
+    if (activeTab === 'live') {
+      source = liveFixtures;
+    } else if (activeTab === 'favourites') {
+      source = source.filter((f) => isFavourite(f.id));
+    } else if (activeTab === 'matches') {
+      // Filter by Date Strip
+      if (selectedDate === 'TODAY') {
+        const todayIso = new Date().toISOString().split('T')[0];
+        source = source.filter((f) => f.utcDate.startsWith(todayIso) || isLiveStatus(f.status));
+      } else if (selectedDate === 'TOMORROW') {
+        const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        source = source.filter((f) => f.utcDate.startsWith(tomorrow));
+      } else if (selectedDate === 'YESTERDAY') {
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        source = source.filter((f) => f.utcDate.startsWith(yesterday));
+      } else if (selectedDate !== 'ALL') {
+        source = source.filter((f) => f.utcDate.startsWith(selectedDate));
       }
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const homeMatch = f.homeTeam.name.toLowerCase().includes(q);
-        const awayMatch = f.awayTeam.name.toLowerCase().includes(q);
-        if (!homeMatch && !awayMatch) return false;
+    }
+
+    // Filter by Search Query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      source = source.filter(
+        (f) =>
+          f.homeTeam.name.toLowerCase().includes(q) ||
+          f.awayTeam.name.toLowerCase().includes(q) ||
+          f.leagueName.toLowerCase().includes(q)
+      );
+    }
+
+    // Group matches under their league
+    source.forEach((f) => {
+      const lid = f.leagueId.toUpperCase();
+      if (!groups[lid]) {
+        const cfg = SUPPORTED_LEAGUES.find((l) => l.id.toUpperCase() === lid);
+        groups[lid] = {
+          leagueId: f.leagueId,
+          leagueName: f.leagueName,
+          country: f.country || cfg?.country || 'International',
+          countryFlag: f.countryFlag || '⚽',
+          logo: f.leagueLogo || cfg?.logo || '',
+          fixtures: [],
+        };
       }
-      return true;
+      groups[lid].fixtures.push(f);
     });
-  }, [fixtures, selectedDate, searchQuery]);
+
+    // Pinned priority: CL and ELC first (as in screenshot), then PL, PD, BL1, SA, FL1
+    const priority = ['CL', 'ELC', 'PL', 'PD', 'BL1', 'SA', 'FL1'];
+    return Object.values(groups).sort((a, b) => {
+      const idxA = priority.indexOf(a.leagueId.toUpperCase());
+      const idxB = priority.indexOf(b.leagueId.toUpperCase());
+      const ordA = idxA !== -1 ? idxA : 99;
+      const ordB = idxB !== -1 ? idxB : 99;
+      return ordA - ordB;
+    });
+  }, [fixtures, liveFixtures, activeTab, selectedDate, searchQuery, isFavourite]);
 
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-[#0a0f1d] text-gray-100' : 'bg-gray-100 text-gray-900'} flex flex-col`}>
-      {/* Navbar */}
+    <div className="min-h-screen bg-edge-bg text-gray-100 flex flex-col font-sans antialiased selection:bg-edge-accent selection:text-white">
+      {/* Top Navbar */}
       <Navbar
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        timezone={timezone}
-        setTimezone={setTimezone}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        liveCount={activeLiveCount}
+        favouritesCount={favourites.size}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenCustomMatch={() => setIsCustomMatchOpen(true)}
         onOpenBacktest={() => setIsBacktestOpen(true)}
-        activeView={activeView}
-        setActiveView={setActiveView}
-        lastUpdated={lastUpdated}
         dataStatus={dataStatus}
-        isLoading={loading}
+        lastUpdated={lastUpdated}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4">
-        {/* League Selector Tabs */}
-        <LeagueTabs
-          leagues={leagues}
-          selectedLeague={selectedLeague}
-          onSelectLeague={(id) => {
-            setSelectedLeague(id);
-            setSelectedDate('ALL');
-          }}
+      {/* Date Strip (Only shown on 'matches' tab) */}
+      {activeTab === 'matches' && (
+        <DateStrip
+          selectedDate={selectedDate}
+          onSelectDate={(date) => setSelectedDate(date)}
         />
+      )}
 
-        {/* View Conditionals */}
-        {activeView === 'matches' && (
-          <>
-            {/* Date Filters & Team Search */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 my-2">
-              <DateChips
-                selectedDate={selectedDate}
-                onSelectDate={setSelectedDate}
-              />
-              <SearchBar
-                query={searchQuery}
-                onChange={setSearchQuery}
-              />
+      {/* Search Bar on Matches, Live, Favourites */}
+      {['matches', 'live', 'favourites'].includes(activeTab) && (
+        <div className="max-w-7xl mx-auto w-full px-3 sm:px-6 pt-3 pb-1">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-edge-muted" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t.searchPlaceholder}
+              className="w-full bg-edge-card border border-edge-border rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-white placeholder-edge-muted focus:outline-none focus:border-edge-accent transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-edge-muted hover:text-white"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 pb-24">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 space-y-3">
+            <RefreshCw className="w-7 h-7 text-edge-accent animate-spin" />
+            <span className="text-xs text-edge-muted">Loading match fixtures and edge odds...</span>
+          </div>
+        ) : error ? (
+          <div className="p-4 bg-red-950/20 border border-red-900/50 rounded-xl text-xs text-red-300 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <span>{error}</span>
             </div>
-
-            {/* Error Message with Retry */}
-            {error && (
-              <div className="p-4 my-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-400 text-xs flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                  <span>{error}</span>
-                </div>
-                <button
-                  onClick={loadFixtures}
-                  className="px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold rounded-lg flex items-center space-x-1"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Retry</span>
-                </button>
-              </div>
-            )}
-
-            {/* Loading Skeletons */}
-            {loading && (
-              <div className="space-y-4 mt-4">
-                {[1, 2, 3].map((n) => (
-                  <div
-                    key={n}
-                    className="p-5 rounded-2xl bg-gray-900/60 border border-gray-800 animate-pulse space-y-3"
-                  >
-                    <div className="h-4 bg-gray-800 rounded w-1/4"></div>
-                    <div className="flex justify-between items-center py-2">
-                      <div className="h-6 bg-gray-800 rounded w-1/3"></div>
-                      <div className="h-6 bg-gray-800 rounded w-1/3"></div>
-                    </div>
-                    <div className="h-3 bg-gray-800 rounded w-full"></div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Match Cards List */}
-            {!loading && !error && (
-              <div className="space-y-4 mt-3">
-                {filteredFixtures.length === 0 ? (
-                  <div className="py-16 text-center text-gray-400 text-xs font-mono bg-gray-900/40 rounded-2xl border border-gray-800">
-                    No fixtures scheduled for this filter selection.
-                  </div>
-                ) : (
-                  filteredFixtures.map((fixture) => (
-                    <MatchCard
-                      key={fixture.id}
-                      fixture={fixture}
-                      timezone={timezone}
+            <button
+              onClick={loadSchedule}
+              className="px-3 py-1 bg-edge-card rounded border border-edge-border hover:bg-edge-border text-white text-xs"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Matches & Live & Favourites Views */}
+            {['matches', 'live', 'favourites'].includes(activeTab) && (
+              <div className="space-y-3">
+                {leagueGroups.length > 0 ? (
+                  leagueGroups.map((group) => (
+                    <LeagueMatchGroup
+                      key={group.leagueId}
+                      leagueId={group.leagueId}
+                      leagueName={group.leagueName}
+                      country={group.country}
+                      countryFlag={group.countryFlag}
+                      leagueLogo={group.logo}
+                      fixtures={group.fixtures}
+                      highlightedGoalMatchId={highlightedGoalMatchId}
+                      onSelectMatch={(f) => setSelectedMatch(f)}
                     />
                   ))
+                ) : (
+                  <div className="py-16 text-center space-y-2 bg-edge-card/40 rounded-xl border border-edge-border/60 p-6">
+                    <span className="text-3xl block">
+                      {activeTab === 'live' ? '⏱️' : activeTab === 'favourites' ? '⭐' : '⚽'}
+                    </span>
+                    <h3 className="text-sm font-semibold text-white">
+                      {activeTab === 'live'
+                        ? 'No Live Matches In Play'
+                        : activeTab === 'favourites'
+                        ? 'No Favourite Matches Added'
+                        : 'No Matches Scheduled'}
+                    </h3>
+                    <p className="text-xs text-edge-muted max-w-md mx-auto">
+                      {activeTab === 'live'
+                        ? 'When matches start, live minute, scores, and in-play probabilities will track here automatically.'
+                        : activeTab === 'favourites'
+                        ? 'Tap the star icon on any match to pin it to your favourites tab.'
+                        : 'Try selecting a different date from the date strip or clearing your search filter.'}
+                    </p>
+                  </div>
                 )}
               </div>
             )}
+
+            {/* Strongest Picks Panel */}
+            {activeTab === 'strongest' && (
+              <StrongestPicksPanel onSelectMatch={(f) => setSelectedMatch(f)} />
+            )}
+
+            {/* Value Picks Panel */}
+            {activeTab === 'value' && (
+              <ValuePicksPanel onSelectMatch={(f) => setSelectedMatch(f)} />
+            )}
           </>
-        )}
-
-        {/* View: Strongest Picks */}
-        {activeView === 'strongest' && (
-          <div className="mt-4">
-            <StrongestPicksPanel leagueId={selectedLeague} />
-          </div>
-        )}
-
-        {/* View: Value Picks */}
-        {activeView === 'value' && (
-          <div className="mt-4">
-            <ValuePicksPanel leagueId={selectedLeague} />
-          </div>
         )}
       </main>
 
-      {/* Accumulator Floating Drawer */}
+      {/* Betslip Floating Drawer */}
       <AccumulatorDrawer />
 
-      {/* Custom Match Simulator Modal */}
+      {/* Footer */}
+      <FooterDisclaimer />
+
+      {/* Modals */}
+      <MatchDetailsModal
+        fixture={selectedMatch}
+        onClose={() => setSelectedMatch(null)}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onOpenHowItWorks={() => setIsHowItWorksOpen(true)}
+      />
+
+      <HowItWorksModal
+        isOpen={isHowItWorksOpen}
+        onClose={() => setIsHowItWorksOpen(false)}
+        onOpenBacktest={() => setIsBacktestOpen(true)}
+      />
+
       <CustomMatchModal
         isOpen={isCustomMatchOpen}
         onClose={() => setIsCustomMatchOpen(false)}
         timezone={timezone}
       />
 
-      {/* Model Backtest & Calibration Modal */}
       <BacktestModal
         isOpen={isBacktestOpen}
         onClose={() => setIsBacktestOpen(false)}
       />
-
-      {/* Footer Disclaimer */}
-      <FooterDisclaimer />
     </div>
   );
 };
 
 export const App: React.FC = () => {
   return (
-    <AccumulatorProvider>
-      <AppContent />
-    </AccumulatorProvider>
+    <SettingsProvider>
+      <AccumulatorProvider>
+        <MainContent />
+      </AccumulatorProvider>
+    </SettingsProvider>
   );
 };
+
+export default App;

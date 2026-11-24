@@ -4,10 +4,11 @@ import { useAccumulator } from '../context/AccumulatorContext.js';
 import { TrendingUp, Plus, Check, Percent, ArrowUpRight } from 'lucide-react';
 
 interface ValuePicksPanelProps {
-  leagueId: string;
+  leagueId?: string;
+  onSelectMatch?: (fixture: any) => void;
 }
 
-export const ValuePicksPanel: React.FC<ValuePicksPanelProps> = ({ leagueId }) => {
+export const ValuePicksPanel: React.FC<ValuePicksPanelProps> = ({ leagueId = 'CL', onSelectMatch }) => {
   const [picks, setPicks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

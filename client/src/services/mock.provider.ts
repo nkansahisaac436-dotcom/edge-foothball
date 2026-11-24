@@ -1,5 +1,6 @@
-import { BookmakerOdds, MatchFixture, TeamMatchStats, TeamStanding } from '../types';
+import { BookmakerOdds, MatchFixture, MatchEvent, LiveMatchStats, TeamMatchStats, TeamStanding } from '../types';
 import { SUPPORTED_LEAGUES } from '../config/leagues';
+import { PredictionEngine } from '../engine/prediction-engine';
 
 export interface TeamProfile {
   id: number;
@@ -117,6 +118,94 @@ function createScheduledMatch(
   };
 }
 
+function createLiveMatch(
+  id: string,
+  leagueId: string,
+  leagueName: string,
+  country: string,
+  homeKey: string,
+  awayKey: string,
+  utcDateIso: string,
+  minute: number,
+  period: '1H' | 'HT' | '2H',
+  homeScore: number,
+  awayScore: number,
+  events: MatchEvent[],
+  stats: LiveMatchStats,
+  round: string = 'League Phase'
+): MatchFixture {
+  const home = REAL_TEAMS[homeKey];
+  const away = REAL_TEAMS[awayKey];
+  const league = SUPPORTED_LEAGUES.find((l) => l.id === leagueId) || SUPPORTED_LEAGUES[0];
+
+  return {
+    id,
+    leagueId,
+    leagueName,
+    leagueLogo: league.logo,
+    country,
+    countryFlag: country === 'Europe' ? '🇪🇺' : country === 'England' ? '🏴󠁧󠁢󠁥󠁮󠁧󠁿' : country === 'Spain' ? '🇪🇸' : '🌍',
+    round,
+    utcDate: utcDateIso,
+    status: period,
+    minute,
+    homeTeam: { id: home.id, name: home.name, shortName: home.shortName, logo: home.logo },
+    awayTeam: { id: away.id, name: away.name, shortName: away.shortName, logo: away.logo },
+    score: {
+      fullTime: { home: homeScore, away: awayScore },
+      halfTime: { home: period === '1H' ? null : 1, away: period === '1H' ? null : 0 },
+    },
+    odds: {
+      homeWin: 2.15,
+      draw: 3.35,
+      awayWin: 3.10,
+      bookmaker: 'SportyBet',
+      over25: 1.85,
+      under25: 1.95,
+      bttsYes: 1.75,
+      bttsNo: 2.05,
+    },
+    events,
+    liveStats: stats,
+    inPlayProbabilities: PredictionEngine.calculateInPlayProbabilities(homeScore, awayScore, minute, 1.45, 1.15),
+  };
+}
+
+function createFinishedMatch(
+  id: string,
+  leagueId: string,
+  leagueName: string,
+  country: string,
+  homeKey: string,
+  awayKey: string,
+  utcDateIso: string,
+  homeScore: number,
+  awayScore: number,
+  events: MatchEvent[] = [],
+  round: string = 'League Phase'
+): MatchFixture {
+  const home = REAL_TEAMS[homeKey];
+  const away = REAL_TEAMS[awayKey];
+  const league = SUPPORTED_LEAGUES.find((l) => l.id === leagueId) || SUPPORTED_LEAGUES[0];
+
+  return {
+    id,
+    leagueId,
+    leagueName,
+    leagueLogo: league.logo,
+    country,
+    countryFlag: country === 'Europe' ? '🇪🇺' : country === 'England' ? '🏴󠁧󠁢󠁥󠁮󠁧󠁿' : country === 'Spain' ? '🇪🇸' : '🌍',
+    round,
+    utcDate: utcDateIso,
+    status: 'FT',
+    minute: 'FT',
+    homeTeam: { id: home.id, name: home.name, shortName: home.shortName, logo: home.logo },
+    awayTeam: { id: away.id, name: away.name, shortName: away.shortName, logo: away.logo },
+    score: { fullTime: { home: homeScore, away: awayScore } },
+    events,
+  };
+}
+
 // Generate schedule for Today, Tomorrow, and upcoming days with exact real-world UTC kickoff timestamps
 export class MobileDataProvider {
   public static getFixtures(leagueFilter?: string, dateFilter?: string): MatchFixture[] {
@@ -146,9 +235,74 @@ export class MobileDataProvider {
     day3.setUTCHours(16, 30, 0, 0);
 
     const allFixtures: MatchFixture[] = [
-      // === TODAY: UEFA CHAMPIONS LEAGUE (Real 17:45 UTC & 20:00 UTC kickoffs, SCHEDULED) ===
-      createScheduledMatch('ucl_today_1', 'CL', 'UEFA Champions League', 'Europe', 'bodo', 'lask', today545.toISOString()),
-      createScheduledMatch('ucl_today_2', 'CL', 'UEFA Champions League', 'Europe', 'galatasaray', 'aston_villa', today545.toISOString()),
+      // === TODAY: UEFA CHAMPIONS LEAGUE ===
+      // Live matches in play (with minute, live score, events, live stats, in-play probabilities)
+      createLiveMatch(
+        'ucl_live_1',
+        'CL',
+        'UEFA Champions League',
+        'Europe',
+        'bodo',
+        'lask',
+        today545.toISOString(),
+        38,
+        '1H',
+        1,
+        0,
+        [
+          { id: 'ev_1', type: 'GOAL', minute: 24, teamSide: 'home', playerName: 'P. Berg', assistPlayerName: 'J. Hauge' },
+          { id: 'ev_2', type: 'CARD_YELLOW', minute: 31, teamSide: 'away', playerName: 'P. Zulj' },
+        ],
+        {
+          minute: 38,
+          homeScore: 1,
+          awayScore: 0,
+          period: '1H',
+          possession: [58, 42],
+          shotsTotal: [6, 2],
+          shotsOnTarget: [3, 1],
+          corners: [4, 1],
+          fouls: [5, 7],
+          yellowCards: [0, 1],
+          redCards: [0, 0],
+        }
+      ),
+      createLiveMatch(
+        'ucl_live_2',
+        'CL',
+        'UEFA Champions League',
+        'Europe',
+        'galatasaray',
+        'aston_villa',
+        today545.toISOString(),
+        67,
+        '2H',
+        1,
+        2,
+        [
+          { id: 'ev_3', type: 'GOAL', minute: 14, teamSide: 'home', playerName: 'M. Icardi', assistPlayerName: 'D. Mertens' },
+          { id: 'ev_4', type: 'CARD_YELLOW', minute: 33, teamSide: 'home', playerName: 'L. Torreira' },
+          { id: 'ev_5', type: 'GOAL', minute: 49, teamSide: 'away', playerName: 'O. Watkins', assistPlayerName: 'M. Rogers' },
+          { id: 'ev_6', type: 'CARD_YELLOW', minute: 52, teamSide: 'away', playerName: 'J. McGinn' },
+          { id: 'ev_7', type: 'SUBSTITUTION', minute: 61, teamSide: 'away', playerName: 'L. Bailey', subOutPlayerName: 'J. Philogene' },
+          { id: 'ev_8', type: 'GOAL', minute: 64, teamSide: 'away', playerName: 'M. Rogers', assistPlayerName: 'Y. Tielemans' },
+        ],
+        {
+          minute: 67,
+          homeScore: 1,
+          awayScore: 2,
+          period: '2H',
+          possession: [48, 52],
+          shotsTotal: [7, 11],
+          shotsOnTarget: [3, 6],
+          corners: [4, 7],
+          fouls: [10, 8],
+          yellowCards: [1, 1],
+          redCards: [0, 0],
+        }
+      ),
+
+      // Today Scheduled UCL matches (Real 20:00 UTC kickoffs, strictly SCHEDULED with null score)
       createScheduledMatch('ucl_today_3', 'CL', 'UEFA Champions League', 'Europe', 'arsenal', 'dortmund', today800.toISOString()),
       createScheduledMatch('ucl_today_4', 'CL', 'UEFA Champions League', 'Europe', 'como', 'aek', today800.toISOString()),
       createScheduledMatch('ucl_today_5', 'CL', 'UEFA Champions League', 'Europe', 'feyenoord', 'porto', today800.toISOString()),
@@ -167,6 +321,10 @@ export class MobileDataProvider {
       createScheduledMatch('ucl_tom_3', 'CL', 'UEFA Champions League', 'Europe', 'atletico_madrid', 'viking', tomorrow800.toISOString()),
       createScheduledMatch('ucl_tom_4', 'CL', 'UEFA Champions League', 'Europe', 'club_brugge', 'liverpool', tomorrow800.toISOString()),
       createScheduledMatch('ucl_tom_5', 'CL', 'UEFA Champions League', 'Europe', 'inter', 'stuttgart', tomorrow800.toISOString()),
+      createScheduledMatch('ucl_tom_6', 'CL', 'UEFA Champions League', 'Europe', 'lille', 'bayern', tomorrow800.toISOString()),
+      createScheduledMatch('ucl_tom_7', 'CL', 'UEFA Champions League', 'Europe', 'psg', 'roma', tomorrow800.toISOString()),
+      createScheduledMatch('ucl_tom_8', 'CL', 'UEFA Champions League', 'Europe', 'shakhtar', 'fenerbahce', tomorrow800.toISOString()),
+      createScheduledMatch('ucl_tom_9', 'CL', 'UEFA Champions League', 'Europe', 'sporting', 'man_utd', tomorrow800.toISOString()),
       createScheduledMatch('ucl_tom_6', 'CL', 'UEFA Champions League', 'Europe', 'lille', 'bayern', tomorrow800.toISOString()),
       createScheduledMatch('ucl_tom_7', 'CL', 'UEFA Champions League', 'Europe', 'psg', 'roma', tomorrow800.toISOString()),
       createScheduledMatch('ucl_tom_8', 'CL', 'UEFA Champions League', 'Europe', 'shakhtar', 'fenerbahce', tomorrow800.toISOString()),

@@ -4,10 +4,11 @@ import { useAccumulator } from '../context/AccumulatorContext.js';
 import { Sparkles, Plus, Check, ShieldCheck, Clock } from 'lucide-react';
 
 interface StrongestPicksPanelProps {
-  leagueId: string;
+  leagueId?: string;
+  onSelectMatch?: (fixture: any) => void;
 }
 
-export const StrongestPicksPanel: React.FC<StrongestPicksPanelProps> = ({ leagueId }) => {
+export const StrongestPicksPanel: React.FC<StrongestPicksPanelProps> = ({ leagueId = 'CL', onSelectMatch }) => {
   const [picks, setPicks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

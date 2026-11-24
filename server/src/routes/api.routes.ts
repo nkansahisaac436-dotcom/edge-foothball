@@ -8,8 +8,10 @@ const router = Router();
 router.get('/leagues', FixturesController.getLeagues);
 router.get('/standings', FixturesController.getStandings);
 
-// Fixtures endpoints
+// Fixtures & Live endpoints
 router.get('/fixtures', FixturesController.getFixtures);
+router.get('/live', FixturesController.getLiveFixtures);
+router.get('/live/stream', FixturesController.getLiveStream);
 
 // Match predictions
 router.get('/match/:id/predictions', PredictionsController.getMatchPredictions);

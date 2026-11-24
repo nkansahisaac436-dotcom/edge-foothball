@@ -118,6 +118,9 @@ export class MockFootballDataProvider implements IFootballDataProvider {
           bttsNo: 2.05,
         };
 
+        const isLive1 = dayOffset === 0 && m === 0;
+        const isLive2 = dayOffset === 0 && m === 1;
+
         fixtures.push({
           id: fixtureId,
           leagueId: league.id,
@@ -125,7 +128,8 @@ export class MockFootballDataProvider implements IFootballDataProvider {
           leagueLogo: league.logo,
           round: `Matchday ${18 + dayOffset}`,
           utcDate: matchDate.toISOString(),
-          status: 'SCHEDULED',
+          status: isLive1 ? '1H' : isLive2 ? '2H' : 'SCHEDULED',
+          minute: isLive1 ? 38 : isLive2 ? 67 : undefined,
           homeTeam: {
             id: homeTeam.id,
             name: homeTeam.name,
@@ -138,8 +142,55 @@ export class MockFootballDataProvider implements IFootballDataProvider {
             shortName: awayTeam.shortName,
             logo: `https://media.api-sports.io/football/teams/${awayTeam.id}.png`,
           },
+          score: {
+            fullTime: {
+              home: isLive1 ? 1 : isLive2 ? 1 : null,
+              away: isLive1 ? 0 : isLive2 ? 2 : null,
+            },
+          },
           odds,
           venue: `${homeTeam.name} Stadium`,
+          events: isLive1
+            ? [
+                { id: `ev_${fixtureId}_1`, type: 'GOAL', minute: 24, teamSide: 'home', playerName: `${homeTeam.shortName} Striker` },
+                { id: `ev_${fixtureId}_2`, type: 'CARD_YELLOW', minute: 31, teamSide: 'away', playerName: `${awayTeam.shortName} Defender` },
+              ]
+            : isLive2
+            ? [
+                { id: `ev_${fixtureId}_3`, type: 'GOAL', minute: 14, teamSide: 'home', playerName: `${homeTeam.shortName} Forward` },
+                { id: `ev_${fixtureId}_4`, type: 'GOAL', minute: 49, teamSide: 'away', playerName: `${awayTeam.shortName} Midfielder` },
+                { id: `ev_${fixtureId}_5`, type: 'GOAL', minute: 64, teamSide: 'away', playerName: `${awayTeam.shortName} Striker` },
+              ]
+            : undefined,
+          liveStats: isLive1
+            ? {
+                minute: 38,
+                homeScore: 1,
+                awayScore: 0,
+                period: '1H',
+                possession: [58, 42],
+                shotsTotal: [6, 2],
+                shotsOnTarget: [3, 1],
+                corners: [4, 1],
+                fouls: [5, 7],
+                yellowCards: [0, 1],
+                redCards: [0, 0],
+              }
+            : isLive2
+            ? {
+                minute: 67,
+                homeScore: 1,
+                awayScore: 2,
+                period: '2H',
+                possession: [48, 52],
+                shotsTotal: [7, 11],
+                shotsOnTarget: [3, 6],
+                corners: [4, 7],
+                fouls: [10, 8],
+                yellowCards: [1, 1],
+                redCards: [0, 0],
+              }
+            : undefined,
         });
         fixtureCounter++;
       }

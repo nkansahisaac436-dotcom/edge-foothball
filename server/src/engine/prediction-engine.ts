@@ -1,12 +1,13 @@
 import {
   ConfidenceLevel,
+  InPlayProbabilities,
   MatchFixture,
   MatchPrediction,
   MarketSelection,
   TeamMatchStats,
 } from '../types/index.js';
 import { getLeagueById } from '../config/leagues.js';
-import { estimateTeamStrengths, generateScorelineMatrix } from './dixon-coles.js';
+import { estimateTeamStrengths, generateScorelineMatrix, poissonPm } from './dixon-coles.js';
 import { calculateCornersDistribution } from './corners-model.js';
 import { calculateCardsDistribution } from './cards-model.js';
 import { blendProbabilities, removeMargin } from './odds-blend.js';
@@ -125,40 +126,41 @@ export class PredictionEngine {
       h2hMatches
     );
 
-    // 8. Select Top 3 Picks for the Match Card
-    // Look across standard high-liquidity markets (Double chance, O1.5, O7.5 corners, BTTS)
-    const candidatePicks: MarketSelection[] = [
+    // 8. Select 3-4 Varied Picks (Distinct Market Categories)
+    // One primary 1X2 or Double Chance
+    const resultCandidates = [
       ...markets.doubleChance.selections,
-      ...markets.totalGoals.selections.filter((s) => s.outcome === 'Over 1.5' || s.outcome === 'Over 2.5' || s.outcome === 'Under 3.5'),
-      ...markets.btts.selections,
-      ...markets.cornersTotal.selections.filter((s) => s.outcome === 'Over 7.5' || s.outcome === 'Over 8.5'),
       ...markets.result1X2.selections,
-    ];
+    ].sort((a, b) => b.probability - a.probability);
+    const primaryResult = resultCandidates.find((p) => p.probability >= 0.50) || resultCandidates[0];
 
-    // Filter to picks with probability between 55% and 88% (strong reliable picks)
-    const filteredCandidates = candidatePicks.filter(
-      (p) => p.probability >= 0.55 && p.probability <= 0.88
-    );
+    // One over/under (goals or corners)
+    const overUnderCandidates = [
+      ...markets.totalGoals.selections.filter((s) => ['Over 1.5', 'Over 2.5', 'Under 3.5'].includes(s.outcome)),
+      ...markets.cornersTotal.selections.filter((s) => ['Over 7.5', 'Over 8.5', 'Over 9.5'].includes(s.outcome)),
+    ].sort((a, b) => b.probability - a.probability);
+    const primaryOverUnder = overUnderCandidates.find((p) => p.probability >= 0.55 && p.probability <= 0.88) || overUnderCandidates[0];
 
-    const sortedByProb = (filteredCandidates.length >= 3 ? filteredCandidates : candidatePicks)
-      .sort((a, b) => b.probability - a.probability);
+    // One combo or BTTS
+    const comboCandidates = [
+      ...markets.bttsCombos.selections,
+      ...markets.btts.selections,
+    ].sort((a, b) => b.probability - a.probability);
+    const primaryCombo = comboCandidates.find((p) => p.probability >= 0.45 && p.probability <= 0.85) || comboCandidates[0];
 
-    // Ensure distinct market types in top 3
+    // One value pick (where fair odds < market odds, or highest edge)
+    const allMarketSelections: MarketSelection[] = Object.values(markets).flatMap((m) => m.selections);
+    const valuePicks = allMarketSelections
+      .filter((s) => s.edge && s.edge > 0.03 && s.probability >= 0.35)
+      .sort((a, b) => (b.edge || 0) - (a.edge || 0));
+    const primaryValue = valuePicks[0];
+
     const topPicks: MarketSelection[] = [];
-    const usedOutcomes = new Set<string>();
-
-    for (const pick of sortedByProb) {
-      const baseKey = pick.outcome.split(' ')[0];
-      if (!usedOutcomes.has(baseKey)) {
-        topPicks.push(pick);
-        usedOutcomes.add(baseKey);
-      }
-      if (topPicks.length >= 3) break;
-    }
-
-    // Fallback if less than 3
-    if (topPicks.length < 3) {
-      topPicks.push(...sortedByProb.slice(0, 3 - topPicks.length));
+    if (primaryResult) topPicks.push(primaryResult);
+    if (primaryOverUnder && !topPicks.some((p) => p.name === primaryOverUnder.name)) topPicks.push(primaryOverUnder);
+    if (primaryCombo && !topPicks.some((p) => p.name === primaryCombo.name)) topPicks.push(primaryCombo);
+    if (primaryValue && !topPicks.some((p) => p.name === primaryValue.name) && topPicks.length < 4) {
+      topPicks.push(primaryValue);
     }
 
     return {
@@ -171,6 +173,66 @@ export class PredictionEngine {
       analysis,
       markets,
       scorelineMatrix,
+    };
+  }
+
+  /**
+   * In-play probability calculation based on Dixon-Coles Poisson remaining time model
+   */
+  public static calculateInPlayProbabilities(
+    currentHomeScore: number,
+    currentAwayScore: number,
+    minute: number,
+    expectedHomeGoalsFull: number = 1.45,
+    expectedAwayGoalsFull: number = 1.15
+  ): InPlayProbabilities {
+    if (minute >= 90) {
+      if (currentHomeScore > currentAwayScore) {
+        return { homeProb: 1.0, drawProb: 0.0, awayProb: 0.0, fairOddsHome: 1.01, fairOddsDraw: 100, fairOddsAway: 100, label: 'Full Time' };
+      } else if (currentHomeScore < currentAwayScore) {
+        return { homeProb: 0.0, drawProb: 0.0, awayProb: 1.0, fairOddsHome: 100, fairOddsDraw: 100, fairOddsAway: 1.01, label: 'Full Time' };
+      } else {
+        return { homeProb: 0.0, drawProb: 1.0, awayProb: 0.0, fairOddsHome: 100, fairOddsDraw: 1.01, fairOddsAway: 100, label: 'Full Time' };
+      }
+    }
+
+    const remainingFraction = Math.max(0.02, (90 - Math.min(minute, 89)) / 90);
+    const remLambda = Math.max(0.01, expectedHomeGoalsFull * remainingFraction);
+    const remMu = Math.max(0.01, expectedAwayGoalsFull * remainingFraction);
+
+    let pHome = 0;
+    let pDraw = 0;
+    let pAway = 0;
+
+    for (let gH = 0; gH <= 6; gH++) {
+      for (let gA = 0; gA <= 6; gA++) {
+        const pJoint = poissonPm(remLambda, gH) * poissonPm(remMu, gA);
+        const finalH = currentHomeScore + gH;
+        const finalA = currentAwayScore + gA;
+
+        if (finalH > finalA) {
+          pHome += pJoint;
+        } else if (finalH === finalA) {
+          pDraw += pJoint;
+        } else {
+          pAway += pJoint;
+        }
+      }
+    }
+
+    const total = pHome + pDraw + pAway;
+    const normHome = total > 0 ? pHome / total : 0.33;
+    const normDraw = total > 0 ? pDraw / total : 0.33;
+    const normAway = total > 0 ? pAway / total : 0.34;
+
+    return {
+      homeProb: Number(normHome.toFixed(4)),
+      drawProb: Number(normDraw.toFixed(4)),
+      awayProb: Number(normAway.toFixed(4)),
+      fairOddsHome: Number(Math.min(100, 1 / Math.max(0.01, normHome)).toFixed(2)),
+      fairOddsDraw: Number(Math.min(100, 1 / Math.max(0.01, normDraw)).toFixed(2)),
+      fairOddsAway: Number(Math.min(100, 1 / Math.max(0.01, normAway)).toFixed(2)),
+      label: 'Live probability',
     };
   }
 }

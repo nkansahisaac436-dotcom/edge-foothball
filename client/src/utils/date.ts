@@ -3,6 +3,8 @@
  * Guarantees that "Invalid Date" is NEVER rendered to the user.
  */
 
+export { formatKickoffTime } from './timezone.js';
+
 export function formatRelativeTime(timestamp: string | number | Date | null | undefined): string {
   if (!timestamp) {
     return 'Updating…';

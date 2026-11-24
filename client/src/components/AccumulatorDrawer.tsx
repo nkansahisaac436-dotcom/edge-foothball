@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAccumulator } from '../context/AccumulatorContext.js';
+import { useSettings } from '../context/SettingsContext.js';
 import { ChevronUp, ChevronDown, Trash2, AlertTriangle, Layers, Copy, Check } from 'lucide-react';
 
 export const AccumulatorDrawer: React.FC = () => {
@@ -13,20 +14,23 @@ export const AccumulatorDrawer: React.FC = () => {
     combinedFairOdds,
   } = useAccumulator();
 
+  const { t, displayOdds } = useSettings();
   const [copied, setCopied] = useState(false);
 
   if (legs.length === 0) return null;
+
+  const hasHighRisk = legs.length > 3;
 
   const handleCopySlip = () => {
     const text = legs
       .map(
         (l, i) =>
-          `${i + 1}. ${l.matchTitle} - ${l.name} (${(l.probability * 100).toFixed(0)}% @${l.fairOdds.toFixed(2)})`
+          `${i + 1}. ${l.matchTitle} - ${l.name} (${(l.probability * 100).toFixed(0)}% @${displayOdds(l.fairOdds)})`
       )
       .join('\n');
-    const fullText = `🎯 Matchday Edge Accumulator (${legs.length} Legs):\n${text}\n\nCombined Probability: ${(
+    const fullText = `🎯 Matchday Edge Slip (${legs.length} Legs):\n${text}\n\nCombined Prob: ${(
       combinedProbability * 100
-    ).toFixed(1)}%\nCombined Fair Odds: @${combinedFairOdds.toFixed(2)}`;
+    ).toFixed(1)}%\nCombined Odds: @${displayOdds(combinedFairOdds)}\n\n⚠️ ${t.accumulatorWarning}`;
 
     navigator.clipboard.writeText(fullText);
     setCopied(true);
@@ -35,101 +39,116 @@ export const AccumulatorDrawer: React.FC = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto px-3 pb-safe">
-      <div className="bg-gray-900/95 backdrop-blur-md border border-gray-800 rounded-t-2xl shadow-2xl overflow-hidden transition-all">
-        {/* Top Header Bar / Toggle */}
+      <div className="bg-edge-card border border-edge-border rounded-t-xl shadow-2xl overflow-hidden transition-all">
+        {/* Persistent Floating Bar / Toggle Header */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full px-4 py-3 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 flex items-center justify-between text-left hover:brightness-110 transition border-b border-gray-800"
+          className="w-full px-4 py-3 bg-edge-bg border-b border-edge-border flex items-center justify-between text-left hover:bg-edge-bg/80 transition"
         >
-          <div className="flex items-center space-x-2.5">
+          <div className="flex items-center space-x-3">
             <div className="relative">
-              <Layers className="w-5 h-5 text-sporty-green" />
-              <span className="absolute -top-2 -right-2 px-1.5 py-0.2 rounded-full bg-sporty-green text-black font-black text-[10px]">
+              <Layers className="w-5 h-5 text-edge-accent" />
+              <span className="tabular-nums absolute -top-2 -right-2 px-1.5 py-0.2 rounded-full bg-edge-accent text-white font-bold text-[10px]">
                 {legs.length}
               </span>
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-bold text-xs text-white uppercase tracking-wider">
-                  Accumulator Slip
+                  {t.slip}
                 </span>
-                <span className="text-[10px] text-gray-400 font-mono">
+                <span className="tabular-nums text-[10px] text-edge-muted font-mono">
                   ({legs.length} {legs.length === 1 ? 'Leg' : 'Legs'})
                 </span>
               </div>
-              <div className="flex items-center space-x-2 text-[11px] font-mono">
-                <span className="text-gray-300">
-                  Combined Prob: <strong className="text-white">{(combinedProbability * 100).toFixed(1)}%</strong>
+              <div className="flex items-center space-x-2 text-[11px] font-mono tabular-nums">
+                <span className="text-edge-muted">
+                  Prob: <strong className="text-white">{(combinedProbability * 100).toFixed(1)}%</strong>
                 </span>
-                <span className="text-sporty-green font-bold">
-                  @{combinedFairOdds.toFixed(2)}
+                <span className="text-edge-accent font-bold">
+                  @{displayOdds(combinedFairOdds)}
                 </span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="text-xs text-sporty-green font-semibold">
-              {isOpen ? 'Minimize' : 'View Bets'}
+            <span className="text-xs text-edge-accent font-medium">
+              {isOpen ? 'Minimize' : 'View Slip'}
             </span>
-            {isOpen ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
+            {isOpen ? <ChevronDown className="w-4 h-4 text-edge-muted" /> : <ChevronUp className="w-4 h-4 text-edge-muted" />}
           </div>
         </button>
 
-        {/* Expanded Slip Details */}
+        {/* Expanded Slip Content */}
         {isOpen && (
-          <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 text-xs">
-            {/* Accumulator Risk Warning */}
-            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-[11px] flex items-start space-x-2 leading-relaxed">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-400 mt-0.5" />
-              <div>
-                <strong className="block text-amber-200 mb-0.5">⚠️ Accumulator Variance Warning:</strong>
-                Combined bets lose exponentially more often than singles. For example, 3 independent selections each with a 70% probability result in only a <strong>34.3% combined win chance</strong> (0.70 × 0.70 × 0.70). Manage stake size carefully.
+          <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 text-xs bg-edge-card">
+            {/* >3 Legs High Risk Warning */}
+            {hasHighRisk && (
+              <div className="p-3 bg-amber-950/20 border border-amber-800/40 rounded-lg text-amber-300 text-[11px] flex items-start space-x-2 leading-relaxed">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-400 mt-0.5" />
+                <div>
+                  <strong className="block text-amber-200 mb-0.5">⚠️ {t.highRiskWarning}</strong>
+                  Accumulators multiply risk rapidly. Each added selection significantly reduces winning probability. Consider singles or doubles instead.
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* List of Legs */}
+            {/* List of Selections */}
             <div className="space-y-2">
               {legs.map((leg) => (
                 <div
                   key={leg.id}
-                  className="p-2.5 bg-gray-950 rounded-xl border border-gray-800 flex items-center justify-between"
+                  className="p-2.5 bg-edge-bg rounded-lg border border-edge-border flex items-center justify-between"
                 >
                   <div className="truncate pr-2">
-                    <span className="text-[10px] text-gray-400 block truncate">{leg.matchTitle}</span>
-                    <span className="font-bold text-xs text-white truncate block">{leg.name}</span>
-                    <div className="flex items-center space-x-2 text-[10px] text-gray-400 font-mono mt-0.5">
-                      <span>Prob: {(leg.probability * 100).toFixed(0)}%</span>
-                      <span className="text-sporty-green">Fair: @{leg.fairOdds.toFixed(2)}</span>
-                    </div>
+                    <span className="text-[10px] text-edge-muted block truncate">{leg.matchTitle}</span>
+                    <span className="font-semibold text-xs text-white truncate block">{leg.name}</span>
+                    <span className="text-[10px] text-edge-muted font-mono tabular-nums">
+                      {Math.round(leg.probability * 100)}% • Fair: @{displayOdds(leg.fairOdds)}
+                    </span>
                   </div>
 
                   <button
                     onClick={() => removeLeg(leg.id)}
-                    className="p-1.5 text-gray-400 hover:text-rose-400 hover:bg-gray-800 rounded-lg transition"
-                    title="Remove from accumulator"
+                    className="p-1.5 text-edge-muted hover:text-red-400 transition"
+                    title="Remove selection"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               ))}
             </div>
 
-            {/* Action Buttons */}
-            <div className="pt-2 flex items-center space-x-2 border-t border-gray-800">
-              <button
-                onClick={clearSlip}
-                className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-semibold transition"
-              >
-                Clear Slip
-              </button>
+            {/* Summary & Responsible Gambling Bar */}
+            <div className="p-3 bg-edge-bg rounded-lg border border-edge-border space-y-2">
+              <div className="flex items-center justify-between text-xs font-mono tabular-nums">
+                <span className="text-edge-muted">{t.combinedOdds}:</span>
+                <span className="text-sm font-bold text-white">@{displayOdds(combinedFairOdds)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs font-mono tabular-nums">
+                <span className="text-edge-muted">{t.combinedProb}:</span>
+                <span className="text-sm font-bold text-white">{(combinedProbability * 100).toFixed(1)}%</span>
+              </div>
+              <p className="text-[10px] text-edge-muted italic pt-1 border-t border-edge-border">
+                {t.accumulatorWarning}
+              </p>
+            </div>
 
+            {/* Actions */}
+            <div className="flex items-center space-x-2 pt-1">
               <button
                 onClick={handleCopySlip}
-                className="flex-1 py-2 bg-sporty-green hover:bg-sporty-green-dark text-black rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition"
+                className="flex-1 flex items-center justify-center space-x-1.5 py-2 px-3 rounded-lg bg-edge-bg hover:bg-edge-border border border-edge-border text-xs text-white font-medium transition"
               >
-                {copied ? <Check className="w-4 h-4 stroke-[3]" /> : <Copy className="w-4 h-4" />}
-                <span>{copied ? 'Copied Slip!' : 'Copy Accumulator'}</span>
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? 'Copied!' : 'Copy Selections'}</span>
+              </button>
+              <button
+                onClick={clearSlip}
+                className="py-2 px-3 rounded-lg bg-edge-bg hover:bg-red-950/30 border border-edge-border text-xs text-red-400 font-medium transition"
+              >
+                {t.clearSlip}
               </button>
             </div>
           </div>
